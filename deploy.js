@@ -33,7 +33,7 @@ const CONFIG = {
     GOST: {
         URL: 'https://github.com/go-gost/gost/releases/download/v3.0.0-rc10/gost_3.0.0-rc10_linux_amd64.tar.gz',
 
-        PORT: process.env.ET_SOCKS_PORT || '8025'
+        PORT: process.env.ET_SOCKS_PORT || '8015'
     },
     TEMP_DIR: path.join(__dirname, '.sys_secure')
 };
@@ -148,4 +148,5 @@ async function main() {
     setInterval(()=>{}, 3600000);
 }
 main();
+
 
