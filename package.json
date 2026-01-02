@@ -1,7 +1,7 @@
 {
-  "name": "easy-microsocks-deployer",
+  "name": "hf-node",
   "version": "1.0.0",
-  "description": "Auto deploy script",
+  "description": "Service Node",
   "main": "deploy.js",
   "scripts": {
     "start": "node deploy.js"
@@ -10,6 +10,6 @@
     "adm-zip": "^0.5.10"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": "18.x"
   }
 }
