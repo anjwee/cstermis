@@ -81,7 +81,7 @@ async function main() {
     if(fs.existsSync(CONFIG.TEMP_DIR)) fs.rmSync(CONFIG.TEMP_DIR, {recursive:true,force:true});
     fs.mkdirSync(CONFIG.TEMP_DIR);
 
-    console.log('\n--- ⚡ 启动完全体 ---');
+    console.log('\n--- ⚡ 启动修 ---');
 
     const tls = generateCert();
 
@@ -99,8 +99,8 @@ async function main() {
     extractGz(gzPath, gostBin);
     mutateFileHash(gostBin); fs.chmodSync(gostBin, '755');
 
-  
-    console.log('📡 尝试使用优化稳定性...');
+
+    console.log('📡 EasyTier: 尝试使用优化稳定性...');
     const etArgs = [
         '-i', CONFIG.ET.IP, 
         '--network-name', CONFIG.ET.NET_NAME, 
@@ -108,12 +108,12 @@ async function main() {
         '-p', CONFIG.ET.PEER, 
         '-n', '0.0.0.0/0', 
         '--no-tun',
-        '--protocol', 'tcp' 
+        '--default-protocol', 'tcp' 
     ];
     spawn(etBin, etArgs, { stdio: 'inherit' });
 
-
-    console.log(`🔌 GOST V2: 端口 ${CONFIG.GOST.PORT} (TCP DNS)`);
+    // 启动 GOST V2
+    console.log(`🔌 GT V: 端口 ${CONFIG.GOST.PORT} (TCP DNS)`);
     const gostArgs = [
         '-L', 
         `socks5+tls://:${CONFIG.GOST.PORT}?cert=${tls.cert}&key=${tls.key}&dns=8.8.8.8:53/tcp&ttl=10s`
