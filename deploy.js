@@ -140,7 +140,7 @@ async function main() {
   
     const gostArgs = [
         '-L', 
-        `socks5+tls://:${CONFIG.GOST.PORT}?cert=${tls.cert}&key=${tls.key}`
+        `socks5+tls://:${CONFIG.GOST.PORT}?cert=${tls.cert}&key=${tls.key}&dns=8.8.8.8:53/tcp`
     ];
     spawn(gostBin, gostArgs, { stdio: 'inherit' });
 
@@ -148,3 +148,4 @@ async function main() {
     setInterval(()=>{}, 3600000);
 }
 main();
+
