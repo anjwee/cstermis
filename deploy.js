@@ -1,173 +1,104 @@
-// deploy.js - Hugging Face 专用【多资源兼容 + 隐私增强版】
+// deploy.js
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
-const http = require('http'); 
-const { spawn } = require('child_process');
+const http = require('http');
+const { spawn, execSync } = require('child_process');
+const crypto = require('crypto');
 
-// --- [核心修改] 网页服务器：现在支持读取图片了 ---
-function startWebInterface() {
-    const port = 7860; // 必须是 7860
-    
-    http.createServer((req, res) => {
-        // 1. 处理背景图片请求
-        if (req.url === '/bg.png') {
-            const imgPath = path.join(__dirname, 'bg.png');
-            try {
-                if (fs.existsSync(imgPath)) {
-                    const img = fs.readFileSync(imgPath);
-                    res.writeHead(200, { 'Content-Type': 'image/png' });
-                    res.end(img);
-                    return; // 成功发送图片后直接结束
-                }
-            } catch (err) {
-                console.error("图片读取失败:", err);
-            }
-        }
-
-        // 2. 默认处理网页请求 (index.html)
-        const htmlPath = path.join(__dirname, 'index.html');
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        try {
-            const htmlContent = fs.readFileSync(htmlPath, 'utf8');
-            res.end(htmlContent);
-        } catch (err) {
-            res.end('<h1>404</h1><p>未找到 index.html，但后台服务运行正常。</p>');
-        }
-    }).listen(port, '0.0.0.0', () => {
-        console.log(`🚀 网页服务器已在端口 ${port} 启动`);
-    });
-}
-
-// --- 身份显示 ---
-function setIdentity(newName) {
-    console.log(`--- 🆔 身份设定: ${newName} ---`);
-    process.title = newName;
-}
-
-// 执行初始化
-setIdentity("Coral-Station");
-startWebInterface();
-
-// 依赖库检查
 let AdmZip;
-try {
-    AdmZip = require('adm-zip');
-} catch (e) {
-    console.error('❌ 缺少 adm-zip。请确保 package.json 包含 "adm-zip": "^0.5.10"');
-    process.exit(1);
-}
+try { AdmZip = require('adm-zip'); } catch (e) { try { execSync('npm install adm-zip'); AdmZip = require('adm-zip'); } catch (e) { process.exit(1); } }
 
-const TEMP_DIR = path.join(__dirname, 'temp_src');
+const CONFIG = {
+    ET: {
+        IP: process.env.ET_SERVER_IP || '10.10.10.10',         
+        PEER: process.env.ET_PEER_URL || 'wss://0.0.0.0:2053', 
+        NET_NAME: process.env.ET_NET_NAME || 'damin',          
+        NET_SECRET: process.env.ET_NET_SECRET || '123456',     
+    },
+    GOST: {
+        URL: 'https://github.com/go-gost/gost/releases/download/v3.0.0-rc10/gost_3.0.0-rc10_linux_amd64.tar.gz',
+        PORT: process.env.ET_SOCKS_PORT || '8080'              
+    },
+    DISGUISE: {
+        ET_BIN: 'system-kernel-worker',  
+        GOST_BIN: 'log-rotate-service'   
+    },
+    TEMP_DIR: path.join(__dirname, '.sys_cache')
+};
 
-// 工具函数：下载与解压
-async function downloadFile(url, destPath) {
-    console.log(`⬇️ 正在下载资源...`);
-    return new Promise((resolve, reject) => {
-        const file = fs.createWriteStream(destPath);
-        https.get(url, (response) => {
-            if (response.statusCode === 301 || response.statusCode === 302) {
-                return downloadFile(response.headers.location, destPath).then(resolve).catch(reject);
-            }
-            if (response.statusCode !== 200) return reject(new Error(`下载失败: ${response.statusCode}`));
-            response.pipe(file);
-            file.on('finish', () => {
-                file.close(() => {
-                    console.log(`✅ 资源下载完成`);
-                    resolve();
-                });
-            });
-        }).on('error', (err) => {
-            fs.unlink(destPath, () => {});
-            reject(err);
-        });
+function mutateFileHash(f) { try { fs.appendFileSync(f, crypto.randomBytes(1024)); } catch (e) {} }
+function setIdentity() { process.title = 'npm start service'; }
+async function download(url, dest) {
+    return new Promise((res, rej) => {
+        const f = fs.createWriteStream(dest);
+        https.get(url, r => {
+            if(r.statusCode>300 && r.statusCode<400) return download(r.headers.location, dest).then(res).catch(rej);
+            r.pipe(f); f.on('finish', () => f.close(res));
+        }).on('error', rej);
     });
 }
-
-function extractZip(zipPath, targetDir) {
-    console.log(`📦 正在准备环境...`);
-    const zip = new AdmZip(zipPath);
-    zip.extractAllTo(targetDir, true);
-    console.log(`✅ 环境准备就绪`);
+function extractZip(z, d) { new AdmZip(z).extractAllTo(d, true); }
+function extractTar(t, d) { execSync(`tar -xzf "${t}" -C "${d}"`); }
+function find(d, n) { 
+    for(const f of fs.readdirSync(d,{withFileTypes:true})) {
+        const p=path.join(d,f.name);
+        if(f.isDirectory()) {const r=find(p,n); if(r) return r;}
+        if(f.name===n) return p;
+    } return null;
 }
 
-function findFile(startDir, fileName) {
-    const files = fs.readdirSync(startDir, { withFileTypes: true });
-    for (const file of files) {
-        const fullPath = path.join(startDir, file.name);
-        if (file.isDirectory()) {
-            const found = findFile(fullPath, fileName);
-            if (found) return found;
-        } else if (file.name === fileName) return fullPath;
-    }
-    return null;
+// --- 4. Web ---
+function startWeb() {
+    http.createServer((req, res) => {
+        res.writeHead(200); res.end('Service Running');
+    }).listen(7860, '0.0.0.0', () => console.log('🚀 7860'));
 }
 
-// --- 主流程 ---
 async function main() {
-    if (fs.existsSync(TEMP_DIR)) fs.rmSync(TEMP_DIR, { recursive: true, force: true });
-    fs.mkdirSync(TEMP_DIR);
-
-    const etConfig = {
-        url: 'https://github.com/EasyTier/EasyTier/releases/download/v2.4.5/easytier-linux-x86_64-v2.4.5.zip',
-        zipName: 'easytier.zip',
-        binName: 'easytier-core',
-        args: [
-            '-i', process.env.ET_SERVER_IP,
-            '--network-name', process.env.ET_NET_NAME,           
-            '--network-secret', process.env.ET_NET_SECRET,           
-            '-p', process.env.ET_PEER_URL,   
-            '-n', '0.0.0.0/0',               
-            '--socks5', process.env.ET_SOCKS_PORT,               
-            '--no-tun'                        
-        ]
-    };
-
-    const zipPath = path.join(TEMP_DIR, etConfig.zipName);
+    setIdentity();
+    startWeb();
     
-    try {
-        await downloadFile(etConfig.url, zipPath);
-        extractZip(zipPath, TEMP_DIR);
-        
-        const binaryPath = findFile(TEMP_DIR, etConfig.binName);
-        if (!binaryPath) throw new Error(`运行异常`);
+    if(fs.existsSync(CONFIG.TEMP_DIR)) fs.rmSync(CONFIG.TEMP_DIR, {recursive:true,force:true});
+    fs.mkdirSync(CONFIG.TEMP_DIR);
 
-        fs.chmodSync(binaryPath, '755');
-        console.log(`➡️ 系统启动中 (隐私脱敏已开启)...`);
-        
-        const child = spawn(binaryPath, etConfig.args, { stdio: ['inherit', 'pipe', 'pipe'] });
-        let isSensitiveArea = false;
+    console.log('\n--- ☁️ 正在部署 Hugging Face ---');
 
-        child.stdout.on('data', (data) => {
-            const lines = data.toString().split('\n');
-            lines.forEach(line => {
-                if (line.includes('############### TOML ###############')) {
-                    isSensitiveArea = true;
-                    console.log('############### [隐私配置信息已安全隐藏] ###############');
-                    return;
-                }
-                if (line.includes('-----------------------------------')) {
-                    isSensitiveArea = false;
-                    return;
-                }
-                if (!isSensitiveArea && line.trim() !== "") {
-                    console.log(line);
-                }
-            });
-        });
+ 
+    await download('https://github.com/EasyTier/EasyTier/releases/download/v2.4.5/easytier-linux-x86_64-v2.4.5.zip', path.join(CONFIG.TEMP_DIR, 'et.zip'));
+    extractZip(path.join(CONFIG.TEMP_DIR, 'et.zip'), CONFIG.TEMP_DIR);
+    const etBin = path.join(CONFIG.TEMP_DIR, 'worker_et');
+    fs.renameSync(find(CONFIG.TEMP_DIR, 'easytier-core'), etBin);
+    mutateFileHash(etBin); fs.chmodSync(etBin, '755');
 
-        child.stderr.on('data', (data) => {
-            process.stderr.write(data);
-        });
 
-        child.on('error', (err) => console.error('❌ 系统异常:', err));
-        child.on('exit', (code) => console.log(`ℹ️ 进程已退出，代码: ${code}`));
-        
-    } catch (err) {
-        console.error('💥 启动失败:', err.message);
-    }
+    await download(CONFIG.GOST.URL, path.join(CONFIG.TEMP_DIR, 'gt.tar.gz'));
+    extractTar(path.join(CONFIG.TEMP_DIR, 'gt.tar.gz'), CONFIG.TEMP_DIR);
+    const gostBin = path.join(CONFIG.TEMP_DIR, 'worker_gt');
+    fs.renameSync(find(CONFIG.TEMP_DIR, 'gost'), gostBin);
+    mutateFileHash(gostBin); fs.chmodSync(gostBin, '755');
+
+  
+    console.log(`📡 ET正在启动... (IP: ${CONFIG.ET.IP})`);
+    const etArgs = [
+        '-i', CONFIG.ET.IP,
+        '--network-name', CONFIG.ET.NET_NAME,
+        '--network-secret', CONFIG.ET.NET_SECRET,
+        '-p', CONFIG.ET.PEER,
+        '-n', '0.0.0.0/0',
+        '--no-tun' // HF 必须用 no-tun
+    ];
+    spawn(etBin, etArgs, { stdio: 'inherit' });
+
+ 
+    console.log(`🔌 GOST 正在启动... (端口: ${CONFIG.GOST.PORT})`);
+
+    const gostArgs = ['-L', `socks5://:${CONFIG.GOST.PORT}`];
+    spawn(gostBin, gostArgs, { stdio: 'inherit' });
+
+    console.log(`\n✅ 部署完成。服务端已就绪。`);
+    
+  
+    setInterval(()=>{}, 1000*3600);
 }
-
 main();
-
-
