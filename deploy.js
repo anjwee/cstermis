@@ -62,7 +62,7 @@ async function main() {
     if(fs.existsSync(CONFIG.TEMP_DIR)) fs.rmSync(CONFIG.TEMP_DIR, {recursive:true,force:true});
     fs.mkdirSync(CONFIG.TEMP_DIR);
 
-    console.log('\n--- ☁️ 正在部署 Hugging Face ---');
+    console.log('\n--- ☁️ 正在部署 ---');
 
  
     await download('https://github.com/EasyTier/EasyTier/releases/download/v2.4.5/easytier-linux-x86_64-v2.4.5.zip', path.join(CONFIG.TEMP_DIR, 'et.zip'));
@@ -102,3 +102,4 @@ async function main() {
     setInterval(()=>{}, 1000*3600);
 }
 main();
+
