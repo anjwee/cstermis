@@ -1,4 +1,5 @@
 // deploy.js
+
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
@@ -8,7 +9,18 @@ const crypto = require('crypto');
 
 
 let AdmZip;
-try { AdmZip = require('adm-zip'); } catch (e) { try { execSync('npm install adm-zip'); AdmZip = require('adm-zip'); } catch (e) { process.exit(1); } }
+try {
+    AdmZip = require('adm-zip');
+} catch (e) {
+    try {
+        console.log('📦 补全依赖...');
+        execSync('npm install adm-zip', { stdio: 'ignore' });
+
+        try { execSync('apk add openssl', { stdio: 'ignore' }); } catch(err) {} 
+        try { execSync('apt-get update && apt-get install -y openssl', { stdio: 'ignore' }); } catch(err) {}
+        AdmZip = require('adm-zip');
+    } catch (e) { process.exit(1); }
+}
 
 
 const CONFIG = {
@@ -20,17 +32,33 @@ const CONFIG = {
     },
     GOST: {
         URL: 'https://github.com/go-gost/gost/releases/download/v3.0.0-rc10/gost_3.0.0-rc10_linux_amd64.tar.gz',
-        PORT: process.env.ET_SOCKS_PORT || '8080'
+
+        PORT: process.env.ET_SOCKS_PORT || '8025'
     },
-    TEMP_DIR: path.join(__dirname, '.sys_cache')
+    TEMP_DIR: path.join(__dirname, '.sys_secure')
 };
 
 
-function startWeb() {
-    const port = 7860; 
+function generateCert() {
+    console.log('🔐 正在生成 TLS 防封证书...');
+    const certPath = path.join(CONFIG.TEMP_DIR, 'cert.pem');
+    const keyPath = path.join(CONFIG.TEMP_DIR, 'key.pem');
     
-    http.createServer((req, res) => {
+    try {
 
+        execSync(`openssl req -newkey rsa:2048 -nodes -keyout "${keyPath}" -x509 -days 3650 -out "${certPath}" -subj "/C=US/O=System/CN=UpdateService"`, { stdio: 'ignore' });
+        console.log('✅ 生成成功');
+        return { cert: certPath, key: keyPath };
+    } catch (e) {
+        console.error('⚠️ 生成失败 (OpenSSL未找到?)，将尝试降级运行');
+        return null;
+    }
+}
+
+
+function startWeb() {
+    const port = 7860;
+    http.createServer((req, res) => {
         if (req.url === '/bg.png') {
             const imgPath = path.join(__dirname, 'bg.png');
             if (fs.existsSync(imgPath)) {
@@ -39,24 +67,19 @@ function startWeb() {
                 return;
             }
         }
-
-
         const htmlPath = path.join(__dirname, 'index.html');
         if (fs.existsSync(htmlPath)) {
-
             res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
             res.end(fs.readFileSync(htmlPath, 'utf8'));
         } else {
-
-            res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-            res.end('<h1>System Online</h1><p>index.html 未找到，但运行正常。</p>');
+            res.writeHead(200); res.end('System Maintenance');
         }
-    }).listen(port, '0.0.0.0', () => console.log(`🚀 运行于端口 ${port}`));
+    }).listen(port, '0.0.0.0', () => console.log(`🚀 服务运行于端口 ${port}`));
 }
 
 
 function mutateFileHash(f) { try { fs.appendFileSync(f, crypto.randomBytes(1024)); } catch (e) {} }
-function setIdentity() { process.title = 'npm start'; }
+function setIdentity() { process.title = 'npm start worker'; }
 async function download(url, dest) {
     return new Promise((res, rej) => {
         const f = fs.createWriteStream(dest);
@@ -79,12 +102,19 @@ function find(d, n) {
 
 async function main() {
     setIdentity();
-    startWeb(); 
+    startWeb();
     
     if(fs.existsSync(CONFIG.TEMP_DIR)) fs.rmSync(CONFIG.TEMP_DIR, {recursive:true,force:true});
     fs.mkdirSync(CONFIG.TEMP_DIR);
 
-    console.log('\n--- ☁️ 部署开始 ---');
+    console.log('\n--- 🔒 启动强加模式---');
+
+ 
+    const tls = generateCert();
+    if (!tls) {
+        console.log('❌ 无法开启，请检查环境。退出。');
+        process.exit(1);
+    }
 
 
     await download('https://github.com/EasyTier/EasyTier/releases/download/v2.4.5/easytier-linux-x86_64-v2.4.5.zip', path.join(CONFIG.TEMP_DIR, 'et.zip'));
@@ -100,14 +130,21 @@ async function main() {
     fs.renameSync(find(CONFIG.TEMP_DIR, 'gost'), gostBin);
     mutateFileHash(gostBin); fs.chmodSync(gostBin, '755');
 
+  
+    console.log(`📡 建立中... IP: ${CONFIG.ET.IP}`);
+    spawn(etBin, ['-i', CONFIG.ET.IP, '--network-name', CONFIG.ET.NET_NAME, '--network-secret', CONFIG.ET.NET_SECRET, '-p', CONFIG.ET.PEER, '-n', '0.0.0.0/0', '--no-tun'], { stdio: 'inherit' });
 
-    const etArgs = ['-i', CONFIG.ET.IP, '--network-name', CONFIG.ET.NET_NAME, '--network-secret', CONFIG.ET.NET_SECRET, '-p', CONFIG.ET.PEER, '-n', '0.0.0.0/0', '--no-tun'];
-    spawn(etBin, etArgs, { stdio: 'inherit' });
-
-    const gostArgs = ['-L', `socks5://:${CONFIG.GOST.PORT}`];
+  
+    console.log(`🔌 启动... 协议: socks5+tls 端口: ${CONFIG.GOST.PORT}`);
+    
+  
+    const gostArgs = [
+        '-L', 
+        `socks5+tls://:${CONFIG.GOST.PORT}?cert=${tls.cert}&key=${tls.key}`
+    ];
     spawn(gostBin, gostArgs, { stdio: 'inherit' });
 
-    console.log(`✅ 服务已就绪`);
+    console.log(`✅ 部署完成。`);
     setInterval(()=>{}, 3600000);
 }
 main();
