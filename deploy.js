@@ -11,7 +11,6 @@ let AdmZip;
 try { AdmZip = require('adm-zip'); } catch (e) { 
     try { execSync('npm install adm-zip', { stdio: 'ignore' }); AdmZip = require('adm-zip'); } catch (e) { process.exit(1); } 
 }
-
 try { execSync('apk add openssl gzip', { stdio: 'ignore' }); } catch(err) {}
 
 const CONFIG = {
@@ -65,10 +64,7 @@ async function download(url, dest) {
         }).on('error', rej);
     });
 }
-
-function extractGz(gzPath, destBin) {
-    execSync(`gzip -d -c "${gzPath}" > "${destBin}"`);
-}
+function extractGz(gzPath, destBin) { execSync(`gzip -d -c "${gzPath}" > "${destBin}"`); }
 function extractZip(z, d) { new AdmZip(z).extractAllTo(d, true); }
 function find(d, n) { 
     for(const f of fs.readdirSync(d,{withFileTypes:true})) {
@@ -85,7 +81,7 @@ async function main() {
     if(fs.existsSync(CONFIG.TEMP_DIR)) fs.rmSync(CONFIG.TEMP_DIR, {recursive:true,force:true});
     fs.mkdirSync(CONFIG.TEMP_DIR);
 
-    console.log('\n--- ⚡ 启动 ---');
+    console.log('\n--- ⚡ 启动完全体 ---');
 
     const tls = generateCert();
 
@@ -100,23 +96,32 @@ async function main() {
     const gzPath = path.join(CONFIG.TEMP_DIR, 'gt.gz');
     await download(CONFIG.GOST.URL, gzPath);
     const gostBin = path.join(CONFIG.TEMP_DIR, 'sys_gt');
-    extractGz(gzPath, gostBin); 
+    extractGz(gzPath, gostBin);
     mutateFileHash(gostBin); fs.chmodSync(gostBin, '755');
 
+  
+    console.log('📡 尝试使用优化稳定性...');
+    const etArgs = [
+        '-i', CONFIG.ET.IP, 
+        '--network-name', CONFIG.ET.NET_NAME, 
+        '--network-secret', CONFIG.ET.NET_SECRET, 
+        '-p', CONFIG.ET.PEER, 
+        '-n', '0.0.0.0/0', 
+        '--no-tun',
+        '--protocol', 'tcp' 
+    ];
+    spawn(etBin, etArgs, { stdio: 'inherit' });
 
-    spawn(etBin, ['-i', CONFIG.ET.IP, '--network-name', CONFIG.ET.NET_NAME, '--network-secret', CONFIG.ET.NET_SECRET, '-p', CONFIG.ET.PEER, '-n', '0.0.0.0/0', '--no-tun'], { stdio: 'inherit' });
 
-
-    console.log(`🔌 V2 启动... 端口: ${CONFIG.GOST.PORT}`);
-    
+    console.log(`🔌 GOST V2: 端口 ${CONFIG.GOST.PORT} (TCP DNS)`);
     const gostArgs = [
         '-L', 
-
         `socks5+tls://:${CONFIG.GOST.PORT}?cert=${tls.cert}&key=${tls.key}&dns=8.8.8.8:53/tcp&ttl=10s`
     ];
     
     spawn(gostBin, gostArgs, { stdio: 'inherit' });
-    console.log(`✅ 部署完成`);
+    
+    console.log(`✅ 部署完成。`);
     setInterval(()=>{}, 3600000);
 }
 main();
