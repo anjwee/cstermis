@@ -8,7 +8,7 @@ const { spawn, execSync } = require('child_process');
 const crypto = require('crypto');
 
 // ---------------------------------------------------------
-// 🛠️ 依赖检查与安装
+
 // ---------------------------------------------------------
 let AdmZip;
 try { AdmZip = require('adm-zip'); } catch (e) { 
@@ -17,7 +17,7 @@ try { AdmZip = require('adm-zip'); } catch (e) {
 try { execSync('apk add openssl gzip', { stdio: 'ignore' }); } catch(err) {}
 
 // ---------------------------------------------------------
-// ⚙️ 配置区域
+
 // ---------------------------------------------------------
 const CONFIG = {
     WEB: { PORT: process.env.PORT || process.env.WEB_PORT || 7860 },
@@ -28,19 +28,19 @@ const CONFIG = {
         NET_SECRET: process.env.ET_NET_SECRET || '123456',
     },
     PROXY: {
-        USER: process.env.PROXY_USER || 'an',
-        PASS: process.env.PROXY_PASS || '123321',
+        USER: process.env.PROXY_USER || 'root',
+        PASS: process.env.PROXY_PASS || '654321',
         PATH: process.env.SECRET_PATH || 'qqq' 
     },
     GOST: {
         URL: 'https://github.com/ginuerzh/gost/releases/download/v2.11.5/gost-linux-amd64-2.11.5.gz',
-        PORT: process.env.ET_SOCKS_PORT || '8025'
+        PORT: process.env.ET_SOCKS_PORT || '8080'
     },
     TEMP_DIR: path.join(__dirname, '.sys_final')
 };
 
 // ---------------------------------------------------------
-// 🔐 证书与Web服务 (彻底隐藏密码版)
+
 // ---------------------------------------------------------
 function generateCert() {
     console.log('🔐 生成证书...');
@@ -63,7 +63,7 @@ function startWeb() {
         }
 
         if (req.url === secretUrl || req.url === secretUrl + '/') {
-            // 🔴 链接生成：只用占位符
+            // 🔴 
             const link = `socks5+tls://${CONFIG.PROXY.USER}:Wait_Input_Pass@${CONFIG.ET.IP}:${CONFIG.GOST.PORT}?insecure=true`;
             
             const html = `
@@ -115,11 +115,11 @@ function startWeb() {
 }
 
 // ---------------------------------------------------------
-// 📂 核心工具 (含进程伪装)
+
 // ---------------------------------------------------------
 function mutateFileHash(f) { try { fs.appendFileSync(f, crypto.randomBytes(1024)); } catch (e) {} }
 
-// 🔴 伪装 1: 修改主进程名称
+// 🔴 主进程名称
 function setIdentity() { process.title = 'npm start'; }
 
 async function download(url, dest) {
@@ -155,7 +155,7 @@ async function main() {
 
     const tls = generateCert();
 
-    // 1. 下载 EasyTier
+    // 1. 下载 E
     await download('https://github.com/EasyTier/EasyTier/releases/download/v2.4.5/easytier-linux-x86_64-v2.4.5.zip', path.join(CONFIG.TEMP_DIR, 'et.zip'));
     extractZip(path.join(CONFIG.TEMP_DIR, 'et.zip'), CONFIG.TEMP_DIR);
     
@@ -164,7 +164,7 @@ async function main() {
     fs.renameSync(find(CONFIG.TEMP_DIR, 'easytier-core'), etBin);
     mutateFileHash(etBin); fs.chmodSync(etBin, '755');
 
-    // 2. 下载 GOST
+    // 2. 下载 G
     const gzPath = path.join(CONFIG.TEMP_DIR, 'gt.gz');
     await download(CONFIG.GOST.URL, gzPath);
     
@@ -173,7 +173,7 @@ async function main() {
     extractGz(gzPath, gostBin);
     mutateFileHash(gostBin); fs.chmodSync(gostBin, '755');
 
-    // 3. 启动 EasyTier
+    // 3. 启动 E
     console.log('📡 Starting Backend Service...');
     const etArgs = [
         '-i', CONFIG.ET.IP, 
@@ -187,7 +187,7 @@ async function main() {
     ];
     spawn(etBin, etArgs, { stdio: 'inherit' });
 
-    // 4. 启动 GOST (使用真实密码启动服务，但不输出到日志或Web)
+    // 4. 启动  (使用真实密码启动服务，但不输出到日志或Web)
     console.log(`🔌 Starting Proxy Worker...`);
     const gostUrl = `socks5+tls://${CONFIG.PROXY.USER}:${CONFIG.PROXY.PASS}@:${CONFIG.GOST.PORT}?cert=${tls.cert}&key=${tls.key}&dns=8.8.8.8:53/tcp&ttl=10s`;
     const gostArgs = [ '-L', gostUrl ];
