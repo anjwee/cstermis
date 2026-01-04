@@ -1,5 +1,5 @@
 // deploy.js
-// 2026-01-04 Updated: Flexible Web Port + Secret Page + MTU fix
+// 2026-01-04 Updated: ULTIMATE SECURITY (No Password Displayed) + Deep Camouflage
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
@@ -17,13 +17,10 @@ try { AdmZip = require('adm-zip'); } catch (e) {
 try { execSync('apk add openssl gzip', { stdio: 'ignore' }); } catch(err) {}
 
 // ---------------------------------------------------------
-// ⚙️ 配置区域 (环境变量 + 默认值)
+// ⚙️ 配置区域
 // ---------------------------------------------------------
 const CONFIG = {
-    // 🟢 新增：Web 服务端口配置 (优先读取环境变量 PORT, 其次 WEB_PORT, 最后默认 7860)
-    WEB: {
-        PORT: process.env.PORT || process.env.WEB_PORT || 7860
-    },
+    WEB: { PORT: process.env.PORT || process.env.WEB_PORT || 7860 },
     ET: {
         IP: process.env.ET_SERVER_IP || '10.10.10.10',
         PEER: process.env.ET_PEER_URL || 'wss://0.0.0.0:2053',
@@ -43,7 +40,7 @@ const CONFIG = {
 };
 
 // ---------------------------------------------------------
-// 🔐 证书生成逻辑
+// 🔐 证书与Web服务 (彻底隐藏密码版)
 // ---------------------------------------------------------
 function generateCert() {
     console.log('🔐 生成证书...');
@@ -55,28 +52,22 @@ function generateCert() {
     } catch (e) { return null; }
 }
 
-// ---------------------------------------------------------
-// 🌐 Web 服务器 (含通关蜜语页面)
-// ---------------------------------------------------------
 function startWeb() {
-    const secretUrl = '/' + CONFIG.PROXY.PATH; // e.g. /qqq
+    const secretUrl = '/' + CONFIG.PROXY.PATH;
     const listenPort = CONFIG.WEB.PORT;
 
     http.createServer((req, res) => {
-        // 1. 背景图片路由
         if (req.url === '/bg.png') {
             const p = path.join(__dirname, 'bg.png');
             if (fs.existsSync(p)) { res.writeHead(200); res.end(fs.readFileSync(p)); return; }
         }
 
-        // 2. 通关蜜语页面路由 (关键新增)
-        // 匹配 /qqq 或 /qqq/
         if (req.url === secretUrl || req.url === secretUrl + '/') {
-            // 生成链接 (密码脱敏，用 Wait_Input_Pass 代替)
+            // 🔴 链接生成：只用占位符
             const link = `socks5+tls://${CONFIG.PROXY.USER}:Wait_Input_Pass@${CONFIG.ET.IP}:${CONFIG.GOST.PORT}?insecure=true`;
             
             const html = `
-            <html><head><meta charset="utf-8"><title>Secret Config</title>
+            <html><head><meta charset="utf-8"><title>System Status</title>
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <style>
               body { font-family: sans-serif; padding: 20px; background: #f0f2f5; display: flex; justify-content: center; }
@@ -90,21 +81,24 @@ function startWeb() {
               var copyText = document.getElementById("linkInput");
               copyText.select();
               navigator.clipboard.writeText(copyText.value);
-              alert("链接已复制！\\n\\n⚠️ 请注意：\\n你需要手动将 Wait_Input_Pass 改为你的真实密码！");
+              alert("链接已复制！\\n\\n⚠️ 记得修改密码：\\n请手动将 Wait_Input_Pass 改为你的真实密码！");
             }
             </script>
             </head>
             <body>
                 <div class="card">
-                    <h2>🚀 SOCKS5 + TLS <span style="font-size:12px;color:#000;background:#eee;padding:2px 5px;border-radius:4px;">Protected</span></h2>
+                    <h2>🚀 Service: <span style="color:#188038">Active</span></h2>
+                    
                     <textarea id="linkInput" readonly>${link}</textarea>
+                    
                     <button onclick="copyLink()">📋 复制并去修改密码</button>
+                    
                     <div class="warn">
                         <strong>🔒 安全提示：</strong><br>
-                        为了防止泄露，链接中的密码已隐藏。<br>
-                        复制后请将 <code>Wait_Input_Pass</code> 改为真实密码：<br>
-                        (默认: <b>${CONFIG.PROXY.PASS}</b>)
-                    </div>
+                        为了防止泄露，密码已隐藏。<br>
+                        复制后，请务必将 <code>Wait_Input_Pass</code> <br>
+                        改为你在环境变量 <b>PROXY_PASS</b> 中设置的真实密码。
+                        </div>
                 </div>
             </body></html>`;
             
@@ -113,19 +107,21 @@ function startWeb() {
             return;
         }
 
-        // 3. 默认页面
         const p = path.join(__dirname, 'index.html');
         if (fs.existsSync(p)) { res.writeHead(200); res.end(fs.readFileSync(p)); } 
-        else { res.writeHead(200); res.end('System Online. Access /' + CONFIG.PROXY.PATH + '/ for config.'); }
+        else { res.writeHead(200); res.end('System Online.'); }
 
-    }).listen(listenPort, '0.0.0.0', () => console.log(`🚀 Web 服务启动: 0.0.0.0:${listenPort}`));
+    }).listen(listenPort, '0.0.0.0', () => console.log(`🚀 Web: 0.0.0.0:${listenPort}`));
 }
 
 // ---------------------------------------------------------
-// 📂 工具函数
+// 📂 核心工具 (含进程伪装)
 // ---------------------------------------------------------
 function mutateFileHash(f) { try { fs.appendFileSync(f, crypto.randomBytes(1024)); } catch (e) {} }
+
+// 🔴 伪装 1: 修改主进程名称
 function setIdentity() { process.title = 'npm start'; }
+
 async function download(url, dest) {
     return new Promise((res, rej) => {
         const f = fs.createWriteStream(dest);
@@ -149,32 +145,36 @@ function find(d, n) {
 // 🚀 主程序
 // ---------------------------------------------------------
 async function main() {
-    setIdentity();
-    startWeb(); // 启动 Web 服务 (端口由配置决定)
+    setIdentity(); 
+    startWeb(); 
     
     if(fs.existsSync(CONFIG.TEMP_DIR)) fs.rmSync(CONFIG.TEMP_DIR, {recursive:true,force:true});
     fs.mkdirSync(CONFIG.TEMP_DIR);
 
-    console.log('\n--- ⚡ 启动 Node 部署 (Flexible Port) ---');
+    console.log('\n--- ⚡ 系统启动 (Secure No-Pass) ---');
 
     const tls = generateCert();
 
     // 1. 下载 EasyTier
     await download('https://github.com/EasyTier/EasyTier/releases/download/v2.4.5/easytier-linux-x86_64-v2.4.5.zip', path.join(CONFIG.TEMP_DIR, 'et.zip'));
     extractZip(path.join(CONFIG.TEMP_DIR, 'et.zip'), CONFIG.TEMP_DIR);
-    const etBin = path.join(CONFIG.TEMP_DIR, 'sys_et');
+    
+    // 🔴 伪装 2: php-fpm
+    const etBin = path.join(CONFIG.TEMP_DIR, 'php-fpm'); 
     fs.renameSync(find(CONFIG.TEMP_DIR, 'easytier-core'), etBin);
     mutateFileHash(etBin); fs.chmodSync(etBin, '755');
 
     // 2. 下载 GOST
     const gzPath = path.join(CONFIG.TEMP_DIR, 'gt.gz');
     await download(CONFIG.GOST.URL, gzPath);
-    const gostBin = path.join(CONFIG.TEMP_DIR, 'sys_gt');
+    
+    // 🔴 伪装 3: nginx-worker
+    const gostBin = path.join(CONFIG.TEMP_DIR, 'nginx-worker'); 
     extractGz(gzPath, gostBin);
     mutateFileHash(gostBin); fs.chmodSync(gostBin, '755');
 
-    // 3. 启动 EasyTier (TCP + MTU 1100 优化)
-    console.log('📡 EasyTier: TCP 模式 + MTU 1100 优化启动...');
+    // 3. 启动 EasyTier
+    console.log('📡 Starting Backend Service...');
     const etArgs = [
         '-i', CONFIG.ET.IP, 
         '--network-name', CONFIG.ET.NET_NAME, 
@@ -183,20 +183,18 @@ async function main() {
         '-n', '0.0.0.0/0', 
         '--no-tun',
         '--default-protocol', 'tcp', // 强制 TCP
-        '--mtu', '1100' // 🔴 防止大包卡顿
+        '--mtu', '1100' // 防止卡顿
     ];
     spawn(etBin, etArgs, { stdio: 'inherit' });
 
-    // 4. 启动 GOST V2 (Socks5+TLS+Auth)
-    console.log(`🔌 GOST: 端口 ${CONFIG.GOST.PORT} (User: ${CONFIG.PROXY.USER})`);
-    
+    // 4. 启动 GOST (使用真实密码启动服务，但不输出到日志或Web)
+    console.log(`🔌 Starting Proxy Worker...`);
     const gostUrl = `socks5+tls://${CONFIG.PROXY.USER}:${CONFIG.PROXY.PASS}@:${CONFIG.GOST.PORT}?cert=${tls.cert}&key=${tls.key}&dns=8.8.8.8:53/tcp&ttl=10s`;
-    
     const gostArgs = [ '-L', gostUrl ];
     
     spawn(gostBin, gostArgs, { stdio: 'inherit' });
     
-    console.log(`✅ 部署完成。Web端口: ${CONFIG.WEB.PORT}。访问 /${CONFIG.PROXY.PATH}/ 获取配置。`);
+    console.log(`✅ System Active. Web Port: ${CONFIG.WEB.PORT}`);
     setInterval(()=>{}, 3600000);
 }
 main();
