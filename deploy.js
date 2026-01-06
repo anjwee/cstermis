@@ -25,6 +25,7 @@ const CONFIG = {
         PEER: process.env.ET_PEER_URL || 'wss://0.0.0.0:2053',
         NET_NAME: process.env.ET_NET_NAME || 'damin',
         NET_SECRET: process.env.ET_NET_SECRET || '123456',
+        NET_BIBI: process.env.ET_NET_BIBI || '****',
     },
     VLESS: {
         // VLESS requires a UUID. If not provided, use this default one.
@@ -86,8 +87,8 @@ function startWeb() {
                     
                     <div class="warn">
                         <strong>💡 连接说明：</strong><br>
-                        此链接基于 EasyTier 虚拟 IP (<code>${CONFIG.ET.IP}</code>)。<br>
-                        你的手机/电脑必须也安装并运行 EasyTier，且加入网络 <b>${CONFIG.ET.NET_NAME}</b> 才能连接成功。
+                        此链接基于虚拟 IP (<code>${CONFIG.ET.NET_BIBI}</code>)。<br>
+                        你的手机/电脑必须也安装并运行，且加入网络 <b>${CONFIG.ET.NET_BIBI}</b> 才能连接成功。
                     </div>
                 </div>
             </body></html>`;
