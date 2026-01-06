@@ -36,7 +36,7 @@ const CONFIG = {
         
 
    
-        PORT: process.env.VLESS_PORT 
+        PORT: process.env.VLESS_PORT || 8011
     },
 
 
@@ -51,7 +51,7 @@ const CONFIG = {
 // ---------------------------------------------------------
 function startWeb() {
  
-    const secretPathVal = CONFIG.SECRET_PATH || '';
+    const secretPathVal = CONFIG.SECRET_PATH || 'b_a_b_y';
     const secretUrl = '/' + secretPathVal;
     const listenPort = CONFIG.WEB.PORT;
 
@@ -217,3 +217,4 @@ async function main() {
 }
 
 main();
+
