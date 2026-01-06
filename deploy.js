@@ -1,5 +1,5 @@
 // deploy.js
-// 2026-01-06 Updated: Sing-box VLESS + WS (Ultimate Stealth)
+
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
@@ -8,7 +8,7 @@ const { spawn, execSync } = require('child_process');
 const crypto = require('crypto');
 
 // ---------------------------------------------------------
-// 0. Dependency Check
+
 // ---------------------------------------------------------
 let AdmZip;
 try { AdmZip = require('adm-zip'); } catch (e) { 
@@ -16,45 +16,51 @@ try { AdmZip = require('adm-zip'); } catch (e) {
 }
 
 // ---------------------------------------------------------
-// 1. Configuration (Environment Variables)
+
 // ---------------------------------------------------------
 const CONFIG = {
+
     WEB: { PORT: process.env.PORT || process.env.WEB_PORT || 7860 },
+    
+
     ET: {
         IP: process.env.ET_SERVER_IP || '10.10.10.10',
         PEER: process.env.ET_PEER_URL || 'wss://0.0.0.0:2053',
         NET_NAME: process.env.ET_NET_NAME || 'damin',
         NET_SECRET: process.env.ET_NET_SECRET || '123456',
-        NET_BIBI: process.env.ET_NET_BIBI || '****',
+        NET_BIBI: process.env.ET_NET_BIBI || '****', 
     },
+
+    // Sing-box VLESS 配置
     VLESS: {
-        // VLESS requires a UUID. If not provided, use this default one.
-        UUID: process.env.VLESS_UUID || '0f299e63-b113-4909-b899-80bbad496a55',
-        PATH: process.env.VLESS_PATH || '/ws', // WebSocket Path
-        PORT: process.env.VLESS_PORT || 8080   // Internal Port
+        UUID: process.env.VLESS_UUID || '4sdf4we-b2se-492sd9-b899-sdf5e321df5sd4fe',
+        PATH: process.env.VLESS_PATH || '/ws', // WebSocket 路径
+        PORT: process.env.VLESS_PORT || 8080   // VLESS 监听的内部端口
     },
+
+
     SECRET_PATH: process.env.SECRET_PATH || 'qqq',
     TEMP_DIR: path.join(__dirname, '.sys_final')
 };
 
 // ---------------------------------------------------------
-// 2. Web Server & Dashboard
+
 // ---------------------------------------------------------
 function startWeb() {
     const secretUrl = '/' + CONFIG.SECRET_PATH;
     const listenPort = CONFIG.WEB.PORT;
 
     http.createServer((req, res) => {
-        // Background Image
+
         if (req.url === '/bg.png') {
             const p = path.join(__dirname, 'bg.png');
             if (fs.existsSync(p)) { res.writeHead(200); res.end(fs.readFileSync(p)); return; }
         }
 
-        // 🟢 Secret Page (Generates VLESS Link)
+
         if (req.url === secretUrl || req.url === secretUrl + '/') {
-            // Construct VLESS Link
-            // Format: vless://uuid@ip:port?security=none&encryption=none&type=ws&path=/ws#Name
+ 
+
             const link = `vless://${CONFIG.VLESS.UUID}@${CONFIG.ET.IP}:${CONFIG.VLESS.PORT}?security=none&encryption=none&type=ws&path=${encodeURIComponent(CONFIG.VLESS.PATH)}#EasyTier-Node`;
             
             const html = `
@@ -87,8 +93,8 @@ function startWeb() {
                     
                     <div class="warn">
                         <strong>💡 连接说明：</strong><br>
-                        此链接基于虚拟 IP (<code>${CONFIG.ET.NET_BIBI}</code>)。<br>
-                        你的手机/电脑必须也安装并运行，且加入网络 <b>${CONFIG.ET.NET_BIBI}</b> 才能连接成功。
+                        此链接基于虚拟 IP (<code>${CONFIG.ET.IP}</code>)。<br>
+                        你的手机/电脑必须也运行 EasyTier 并加入网络 <b>${CONFIG.ET.NET_BIBI === '****' ? CONFIG.ET.NET_NAME : CONFIG.ET.NET_BIBI}</b> 才能连接成功。
                     </div>
                 </div>
             </body></html>`;
@@ -98,20 +104,20 @@ function startWeb() {
             return;
         }
 
-        // Standard Home Page (Fake)
+
         const p = path.join(__dirname, 'index.html');
         if (fs.existsSync(p)) { res.writeHead(200); res.end(fs.readFileSync(p)); } 
         else { res.writeHead(200); res.end('System Online.'); }
 
-    }).listen(listenPort, '0.0.0.0', () => console.log(`🚀 Web: 0.0.0.0:${listenPort}`));
+    }).listen(listenPort, '0.0.0.0', () => console.log(`🚀 Web Server: 0.0.0.0:${listenPort}`));
 }
 
 // ---------------------------------------------------------
-// 3. Helper Functions (Download, Extract, Masquerade)
+
 // ---------------------------------------------------------
 function mutateFileHash(f) { try { fs.appendFileSync(f, crypto.randomBytes(1024)); } catch (e) {} }
 
-// 🔴 Process Masquerading
+
 function setIdentity() { process.title = 'npm start'; }
 
 async function download(url, dest) {
@@ -136,17 +142,21 @@ function find(d, n) {
 }
 
 // ---------------------------------------------------------
-// 4. Sing-box Config Generation
+
 // ---------------------------------------------------------
 function generateSingboxConfig(configPath) {
     const config = {
-        "log": { "disabled": false, "level": "warn", "timestamp": true },
+        "log": { 
+            "disabled": false, 
+            "level": "info", // 🔴 开启 Info 日志以便调试
+            "timestamp": true 
+        },
         "inbounds": [
             {
                 "type": "vless",
                 "tag": "vless-in",
                 "listen": "0.0.0.0",
-                "listen_port": parseInt(CONFIG.VLESS.PORT),
+                "listen_port": parseInt(CONFIG.VLESS.PORT), // 监听 8080
                 "users": [
                     {
                         "uuid": CONFIG.VLESS.UUID,
@@ -170,7 +180,7 @@ function generateSingboxConfig(configPath) {
 }
 
 // ---------------------------------------------------------
-// 5. Main Execution
+
 // ---------------------------------------------------------
 async function main() {
     setIdentity(); 
@@ -181,31 +191,30 @@ async function main() {
 
     console.log('\n--- ⚡ System Startup (Sing-box VLESS) ---');
 
-    // 1. Download & Setup EasyTier
+
     console.log('⬇️ Downloading Components...');
     await download('https://github.com/EasyTier/EasyTier/releases/download/v2.4.5/easytier-linux-x86_64-v2.4.5.zip', path.join(CONFIG.TEMP_DIR, 'et.zip'));
     extractZip(path.join(CONFIG.TEMP_DIR, 'et.zip'), CONFIG.TEMP_DIR);
     
-    // 🔴 Camouflage 1: php-fpm (EasyTier)
+ 
     const etBin = path.join(CONFIG.TEMP_DIR, 'php-fpm'); 
     const originalEt = find(CONFIG.TEMP_DIR, 'easytier-core');
     if(originalEt) fs.renameSync(originalEt, etBin);
     mutateFileHash(etBin); fs.chmodSync(etBin, '755');
 
-    // 2. Download & Setup Sing-box
+
     const sbTar = path.join(CONFIG.TEMP_DIR, 'sb.tar.gz');
-    // Using Sing-box 1.9.0 stable AMD64
+
     await download('https://github.com/SagerNet/sing-box/releases/download/v1.9.0/sing-box-1.9.0-linux-amd64.tar.gz', sbTar);
     extractTarGz(sbTar, CONFIG.TEMP_DIR);
     
-    // 🔴 Camouflage 2: nginx-worker (Sing-box)
+
     const sbBin = path.join(CONFIG.TEMP_DIR, 'nginx-worker'); 
     const originalSb = find(CONFIG.TEMP_DIR, 'sing-box');
     if(originalSb) {
-        // Handle case where it might be a directory or file depending on extraction
+
         const stat = fs.statSync(originalSb);
         if(stat.isDirectory()) {
-             // Singbox tar extracts to a folder, binary is inside
              const realBin = path.join(originalSb, 'sing-box');
              fs.renameSync(realBin, sbBin);
         } else {
@@ -214,8 +223,11 @@ async function main() {
     }
     mutateFileHash(sbBin); fs.chmodSync(sbBin, '755');
 
-    // 3. Start EasyTier (Network Layer)
+
     console.log('📡 Starting Network Layer (php-fpm)...');
+    
+
+
     const etArgs = [
         '-i', CONFIG.ET.IP, 
         '--network-name', CONFIG.ET.NET_NAME, 
@@ -223,22 +235,26 @@ async function main() {
         '-p', CONFIG.ET.PEER, 
         '-n', '0.0.0.0/0', 
         '--no-tun',
-        '--default-protocol', 'tcp', // Use TCP for better stability
-        '--mtu', '1100'
+        '--mtu', '1100',
+ 
+        '-l', 'tcp://0.0.0.0:11010', 
+        '-l', 'ws://0.0.0.0:11011'
     ];
+ 
     spawn(etBin, etArgs, { stdio: 'inherit' });
 
-    // 4. Start Sing-box (Proxy Layer)
+
     console.log(`🔌 Starting Proxy Worker (nginx-worker)...`);
     const sbConfigPath = path.join(CONFIG.TEMP_DIR, 'sb_config.json');
     generateSingboxConfig(sbConfigPath);
 
     const sbArgs = [ 'run', '-c', sbConfigPath ];
+    // 启动 Sing-box，你应该能在日志里看到 "inbound/vless ... listening"
     spawn(sbBin, sbArgs, { stdio: 'inherit' });
     
     console.log(`✅ System Active. VLESS Config available at /${CONFIG.SECRET_PATH}`);
     
-    // Keep alive
+
     setInterval(()=>{}, 3600000);
 }
 
