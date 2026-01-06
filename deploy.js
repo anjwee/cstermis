@@ -24,8 +24,8 @@ const CONFIG = {
     ET: {
         IP: process.env.ET_SERVER_IP || '10.10.10.10',
         PEER: process.env.ET_PEER_URL || 'wss://0.0.0.0:2053',
-        NET_NAME: process.env.ET_NET_NAME || 'damin',
-        NET_SECRET: process.env.ET_NET_SECRET || '123456',
+        NET_NAME: process.env.ET_NET_NAME || 'default_name',
+        NET_SECRET: process.env.ET_NET_SECRET || 'default_pass',
         NET_BIBI: process.env.ET_NET_BIBI || 'EasyTier', 
     },
 
@@ -217,4 +217,5 @@ async function main() {
 }
 
 main();
+
 
