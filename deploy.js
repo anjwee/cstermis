@@ -141,27 +141,46 @@ function find(d, n) {
 // ---------------------------------------------------------
 
 // ---------------------------------------------------------
+// ---------------------------------------------------------
+// 4. 生成配置 (修复 DNS Name Error 版)
+// ---------------------------------------------------------
 function generateSingboxConfig(configPath) {
-
-
     if (!CONFIG.VLESS.PORT) {
-        console.error("❌ 致命错误: 环境变量 VLESS_PORT 未设置！请检查 Railway Variables。");
+        console.error("❌ 致命错误: 环境变量 VLESS_PORT 未设置！");
         process.exit(1);
     }
     
     const config = {
         "log": { "disabled": false, "level": "info", "timestamp": true },
+        
+        "dns": {
+            "servers": [
+                { "tag": "google", "address": "8.8.8.8", "detour": "direct" },
+                { "tag": "local", "address": "local", "detour": "direct" }
+            ],
+            "rules": [
+                { "outbound": "any", "server": "google" } 
+            ],
+            "strategy": "ipv4_only" 
+        },
         "inbounds": [
             {
                 "type": "vless",
                 "tag": "vless-in",
                 "listen": "0.0.0.0",
-                "listen_port": parseInt(CONFIG.VLESS.PORT), // 严格读取变量
+                "listen_port": parseInt(CONFIG.VLESS.PORT),
                 "users": [{ "uuid": CONFIG.VLESS.UUID, "name": "user1" }],
                 "transport": { "type": "ws", "path": CONFIG.VLESS.PATH }
             }
         ],
-        "outbounds": [{ "type": "direct", "tag": "direct" }]
+        "outbounds": [
+            { 
+                "type": "direct", 
+                "tag": "direct",
+                
+                "domain_strategy": "ipv4_only" 
+            }
+        ]
     };
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 }
@@ -217,5 +236,4 @@ async function main() {
 }
 
 main();
-
 
