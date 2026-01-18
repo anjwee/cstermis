@@ -30,4 +30,6 @@ PROXY_PASS=654321
 WEB_PORT=7860
 SECRET_PATH=sub
 ```
-
+```bash
+ghcr.io/anjwee/cstermis:latest
+```
