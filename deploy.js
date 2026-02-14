@@ -51,7 +51,7 @@ const CONFIG = {
 // ---------------------------------------------------------
 function startWeb() {
  
-    const secretPathVal = CONFIG.SECRET_PATH || 'b_a_b_y';
+    const secretPathVal = CONFIG.SECRET_PATH || 'sub';
     const secretUrl = '/' + secretPathVal;
     const listenPort = CONFIG.WEB.PORT;
 
@@ -236,4 +236,5 @@ async function main() {
 }
 
 main();
+
 
